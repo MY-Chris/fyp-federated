@@ -79,15 +79,32 @@ if __name__ == '__main__':
         if not args.all_clients:
             w_locals = []
         m = max(int(args.frac * args.num_users), 1)
-        idxs_users = np.random.choice(range(args.num_users), m, replace=False)
+        #idxs_users = np.random.choice(range(args.num_users), m, replace=False)
+        idxs_users = range(args.num_users)
+        norm_deltaw = []
         for idx in idxs_users:
             local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
             w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
+            #calculate delta w
+            norm = 0
+            for k in w_glob.keys():
+                norm += torch.norm(w[k]-w_glob[k])
+
             if args.all_clients:
                 w_locals[idx] = copy.deepcopy(w)
+                norm_deltaw[idx] = copy.deepcopy(norm)
             else:
                 w_locals.append(copy.deepcopy(w))
+                norm_deltaw.append(copy.deepcopy(norm))
             loss_locals.append(copy.deepcopy(loss))
+            print(idx,'\n')
+
+        # choose users to update in this round
+        norm_deltaw = np.array(norm_deltaw)
+        idxs_users = norm_deltaw.argsort()[-10:]
+        w_locals = [w_locals[x] for x in idxs_users]
+        loss_locals = [loss_locals[x] for x in idxs_users]
+
         # update global weights
         w_glob = FedAvg(w_locals)
 
