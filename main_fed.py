@@ -113,7 +113,7 @@ if __name__ == '__main__':
             for k in w_glob.keys():
                 delta_w = w[k] - w_glob[k]
                 deltaw_list.append(delta_w.resize(1, torch.numel(delta_w)))
-            big_tensor = tensor.cat(deltaw_list, 1)
+            big_tensor = torch.cat(deltaw_list, 1)
             topvalues, topindices = torch.topk(big_tensor, q_t[idx])
             bottomvalues, bottomindices = torch.topk(big_tensor, q_t[idx], largest=False)
             values = tensor.cat((topvalues, bottomvalues), 1).numpy()
