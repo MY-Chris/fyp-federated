@@ -9,7 +9,8 @@ import copy
 import numpy as np
 from torchvision import datasets, transforms
 import torch
-
+import math
+from numpy import linalg as LA
 from utils.sampling import mnist_iid, mnist_noniid, cifar_iid
 from utils.options import args_parser
 from models.Update import LocalUpdate
@@ -71,10 +72,28 @@ if __name__ == '__main__':
     best_loss = None
     val_acc_list, net_list = [], []
 
+    P_t = 1
+    N = 5000
+    d = 203530
+
     if args.all_clients: 
         print("Aggregation over all clients")
         w_locals = [w_glob for i in range(args.num_users)]
     for iter in range(args.epochs):
+        h_t = np.random.normal(0, 1, args.num_users)
+        noise_locals = np.random.normal(0, 1, args.num_users)
+        C_t = []
+        r_q = []
+        for h in h_t:
+            tempc = math.log(1 + abs(h) * P_t, 2)
+            C_t.append(tempc)
+            r_q.append(N * tempc)
+        q_t = []
+        for r in r_q:
+            q_local = 1
+            while r > math.log(math.comb(d, q_local), 2) + 33:
+                q_local = q_local + 1
+            q_t.append(q_local - 1)
         loss_locals = []
         if not args.all_clients:
             w_locals = []
@@ -86,10 +105,24 @@ if __name__ == '__main__':
             local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
             w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
             #calculate delta w
+            #norm = 0
+            #for k in w_glob.keys():
+                #norm += math.pow(torch.norm(w[k]-w_glob[k]), 2)
             norm = 0
+            deltaw_list = []
             for k in w_glob.keys():
-                norm += torch.norm(w[k]-w_glob[k])
-
+                delta_w = w[k] - w_glob[k]
+                deltaw_list.append(delta_w.resize(1, torch.numel(delta_w)))
+            big_tensor = tensor.cat(deltaw_list, 1)
+            topvalues, topindices = torch.topk(big_tensor, q_t[idx])
+            bottomvalues, bottomindices = torch.topk(big_tensor, q_t[idx], largest=False)
+            values = tensor.cat((topvalues, bottomvalues), 1).numpy()
+            positive_average = np.average(values[values > 0])
+            negative_average = np.average(values[values < 0])
+            if(positive_average + negative_average < 0):
+                norm = LA.norm(values[values < 0])
+            else:
+                norm = LA.norm(values[values > 0])
             if args.all_clients:
                 w_locals[idx] = copy.deepcopy(w)
                 norm_deltaw[idx] = copy.deepcopy(norm)
