@@ -116,7 +116,7 @@ if __name__ == '__main__':
             big_tensor = torch.cat(deltaw_list, 1)
             topvalues, topindices = torch.topk(big_tensor, q_t[idx])
             bottomvalues, bottomindices = torch.topk(big_tensor, q_t[idx], largest=False)
-            values = tensor.cat((topvalues, bottomvalues), 1).numpy()
+            values = torch.cat((topvalues, bottomvalues), 1).cpu().numpy()
             positive_average = np.average(values[values > 0])
             negative_average = np.average(values[values < 0])
             if(positive_average + negative_average < 0):
@@ -130,7 +130,7 @@ if __name__ == '__main__':
                 w_locals.append(copy.deepcopy(w))
                 norm_deltaw.append(copy.deepcopy(norm))
             loss_locals.append(copy.deepcopy(loss))
-            print(idx,'\n')
+            #print(idx,'\n')
 
         # choose users to update in this round
         norm_deltaw = np.array(norm_deltaw)
