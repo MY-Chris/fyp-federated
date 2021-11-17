@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Python version: 3.6
+# Python version: 3.8
 
 import matplotlib
 matplotlib.use('Agg')
@@ -10,7 +10,7 @@ import numpy as np
 from torchvision import datasets, transforms
 import torch
 import math
-import tensorflow as tf
+#import tensorflow as tf
 from numpy import linalg as LA
 from utils.sampling import mnist_iid, mnist_noniid, cifar_iid
 from utils.options import args_parser
@@ -75,8 +75,9 @@ if __name__ == '__main__':
 
     P_t = 1
     N = 5000
-    d = torch.numel(w_glob[0])
-
+    d = 0;
+    for k in w_glob.keys():
+        d += torch.numel(w_glob[k])
     if args.all_clients: 
         print("Aggregation over all clients")
         w_locals = [w_glob for i in range(args.num_users)]
@@ -123,12 +124,7 @@ if __name__ == '__main__':
             topvalues, topindices = torch.topk(big_tensor, q_t[idx])
             bottomvalues, bottomindices = torch.topk(big_tensor, q_t[idx], largest=False)
             values = torch.cat((topvalues, bottomvalues), 1).cpu().numpy()
-            #positive_average = np.average(values[values > 0])
-            #negative_average = np.average(values[values < 0])
-            #if(positive_average + negative_average < 0):
-            #    norm = LA.norm(values[values < 0])
-            #else:
-            #    norm = LA.norm(values[values > 0])
+            values = np.reshape(values, values[0].size)
             values = np.abs(values)
             largest_q_idx = np.argpartition(values, 0-q_t[idx])[(0-q_t[idx]):]
             norm = LA.norm([values[x] for x in largest_q_idx])
@@ -168,34 +164,38 @@ if __name__ == '__main__':
         q_m_t = []
         for i in idxs_users:
             q_local = 1
-            while C_t[i] * n_k[idxs_users.index(i)] > math.log(math.comb(d, q_local), 2) + 33 * q_local:
+            while C_t[i] * n_k[idxs_users.tolist().index(i)] > math.log(math.comb(d, q_local), 2) + 33 * q_local:
                 q_local = q_local + 1
             q_m_t.append(q_local - 1)
         
         #consider wireless communication, change w
-        for w in w_locals:
+        for idx in range(len(w_locals)):
             deltaw_list = []
             for k in w_glob.keys():
-                delta_w = w[k] - w_glob[k]
+                delta_w = w_locals[idx][k] - w_glob[k]
                 deltaw_list.append(delta_w.resize(1, torch.numel(delta_w)))
             big_tensor = torch.cat(deltaw_list, 1)
             topvalues, topindices = torch.topk(big_tensor, q_m_t[idx])
             bottomvalues, bottomindices = torch.topk(big_tensor, q_m_t[idx], largest=False)
             values = torch.cat((topvalues, bottomvalues), 1).cpu().numpy()
+            values = np.reshape(values, values[0].size)
             values_abs = np.abs(values)
             largest_q_idx = np.argpartition(values_abs, 0-q_m_t[idx])[(0-q_m_t[idx]):]
             values = [values[x] for x in largest_q_idx]
-            v_min = values.min()
-            quantize_d = (values.max() - v_min) / math.pow(2, 33);
+            v_min = min(values)
+            quantize_d = (max(values) - v_min) / math.pow(2, 33);
+            quantized_values = []
             for v in values:
-                v = int((v - v_min) / d) * d + v_min
+                temp_v = int((v - v_min) / quantize_d) * quantize_d + v_min
+                quantized_values.append(temp_v)
             w_result = copy.deepcopy(w_glob)
-            for v in values: 
-                for k in w.keys():
-                    indices = (w[k] == v).nonzero(as_tuple=False)
-                    updates = tf.constant([v] * tf.size(indices))
-                    w_result[k] = tf.tensor_scatter_nd_add(w_result[k], indices, updates)
-            w = w_result
+            for i in range(len(values)): 
+                for k in w_locals[idx].keys():
+                    indices = (w_locals[idx][k] - w_glob[k] == values[i]).nonzero(as_tuple=False)
+                    print(indices)
+                    #updates = tf.constant([quantized_values[i]] * int(tf.size(indices)))
+                    #w_result[k] = tf.tensor_scatter_nd_add(w_result[k], indices, updates)
+            w_locals[idx] = w_result
 
         # update global weights
         w_glob = FedAvg(w_locals)
