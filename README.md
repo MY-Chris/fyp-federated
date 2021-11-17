@@ -7,7 +7,7 @@ Note: The scripts will be slow without the implementation of parallel computing.
 
 ## Requirements
 python>=3.8  
-pytorch>=0.4
+pytorch>=0.4  
 tensorflow
 
 ## Run
