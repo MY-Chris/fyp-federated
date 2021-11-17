@@ -6,8 +6,9 @@ Only experiments on MNIST and CIFAR10 (both IID and non-IID) is produced by far.
 Note: The scripts will be slow without the implementation of parallel computing. 
 
 ## Requirements
-python>=3.6  
+python>=3.8  
 pytorch>=0.4
+tensorflow
 
 ## Run
 
