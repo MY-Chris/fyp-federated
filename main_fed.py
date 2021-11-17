@@ -90,7 +90,7 @@ if __name__ == '__main__':
         C_t = []
         r_q = []
         for h in h_t:
-            tempc = math.log(1 + abs(h) * P_t, 2)
+            tempc = math.log(1 + math.pow(abs(h), 2) * P_t, 2)
             C_t.append(tempc)
             r_q.append(N * tempc)
         # q_t is q*(t) in paper
@@ -185,11 +185,16 @@ if __name__ == '__main__':
             values_abs = np.abs(values)
             largest_q_idx = np.argpartition(values_abs, 0-q_m_t[idx])[(0-q_m_t[idx]):]
             values = [values[x] for x in largest_q_idx]
+            v_min = values.min()
+            quantize_d = (values.max() - v_min) / math.pow(2, 33);
+            for v in values:
+                v = int((v - v_min) / d) * d + v_min
             w_result = copy.deepcopy(w_glob)
             for v in values: 
-                indices = (w == v).nonzero(as_tuple=False)
-                updates = tf.constant([v] * tf.size(indices))
-                w_result = tf.tensor_scatter_nd_add(w_result, indices, updates)
+                for k in w.keys():
+                    indices = (w[k] == v).nonzero(as_tuple=False)
+                    updates = tf.constant([v] * tf.size(indices))
+                    w_result[k] = tf.tensor_scatter_nd_add(w_result[k], indices, updates)
             w = w_result
 
         # update global weights
