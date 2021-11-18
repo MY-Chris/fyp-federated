@@ -192,9 +192,10 @@ if __name__ == '__main__':
             for i in range(len(values)): 
                 for k in w_locals[idx].keys():
                     indices = (w_locals[idx][k] - w_glob[k] == values[i]).nonzero(as_tuple=False)
+                    indices = indices.detach().to("cpu").numpy()
                     print(indices)
-                    #updates = tf.constant([quantized_values[i]] * int(tf.size(indices)))
-                    #w_result[k] = tf.tensor_scatter_nd_add(w_result[k], indices, updates)
+                    for index in indices:
+                        w_result[k][tuple(index)] += quantized_values[i]
             w_locals[idx] = w_result
 
         # update global weights
