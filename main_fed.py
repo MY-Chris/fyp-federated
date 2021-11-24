@@ -10,7 +10,6 @@ import numpy as np
 from torchvision import datasets, transforms
 import torch
 import math
-#import tensorflow as tf
 from numpy import linalg as LA
 from utils.sampling import mnist_iid, mnist_noniid, cifar_iid
 from utils.options import args_parser
@@ -73,9 +72,9 @@ if __name__ == '__main__':
     best_loss = None
     val_acc_list, net_list = [], []
 
-    P_t = 1
+    P_t = 1 / args.frac
     N = 5000
-    d = 0;
+    d = 0
     for k in w_glob.keys():
         d += torch.numel(w_glob[k])
     if args.all_clients: 
@@ -135,7 +134,6 @@ if __name__ == '__main__':
                 w_locals.append(copy.deepcopy(w))
                 norm_deltaw.append(copy.deepcopy(norm))
             loss_locals.append(copy.deepcopy(loss))
-            #print(idx,'\n')
 
         # choose users to update in this round
         k = int(args.num_users * args.frac)
@@ -167,7 +165,7 @@ if __name__ == '__main__':
             while C_t[i] * n_k[idxs_users.tolist().index(i)] > math.log(math.comb(d, q_local), 2) + 33 * q_local:
                 q_local = q_local + 1
             q_m_t.append(q_local - 1)
-        
+
         #consider wireless communication, change w
         for idx in range(len(w_locals)):
             deltaw_list = []
@@ -183,7 +181,7 @@ if __name__ == '__main__':
             largest_q_idx = np.argpartition(values_abs, 0-q_m_t[idx])[(0-q_m_t[idx]):]
             values = [values[x] for x in largest_q_idx]
             v_min = min(values)
-            quantize_d = (max(values) - v_min) / math.pow(2, 33);
+            quantize_d = (max(values) - v_min) / math.pow(2, 33)
             quantized_values = []
             for v in values:
                 temp_v = int((v - v_min) / quantize_d) * quantize_d + v_min
@@ -193,7 +191,6 @@ if __name__ == '__main__':
                 for k in w_locals[idx].keys():
                     indices = (w_locals[idx][k] - w_glob[k] == values[i]).nonzero(as_tuple=False)
                     indices = indices.detach().to("cpu").numpy()
-                    print(indices)
                     for index in indices:
                         w_result[k][tuple(index)] += quantized_values[i]
             w_locals[idx] = w_result
