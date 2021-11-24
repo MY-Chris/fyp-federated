@@ -111,22 +111,23 @@ if __name__ == '__main__':
             local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
             w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
             #calculate delta w
-            #norm = 0
-            #for k in w_glob.keys():
-                #norm += math.pow(torch.norm(w[k]-w_glob[k]), 2)
             norm = 0
-            deltaw_list = []
-            for k in w_glob.keys():
-                delta_w = w[k] - w_glob[k]
-                deltaw_list.append(delta_w.resize(1, torch.numel(delta_w)))
-            big_tensor = torch.cat(deltaw_list, 1)
-            topvalues, topindices = torch.topk(big_tensor, q_t[idx])
-            bottomvalues, bottomindices = torch.topk(big_tensor, q_t[idx], largest=False)
-            values = torch.cat((topvalues, bottomvalues), 1).cpu().numpy()
-            values = np.reshape(values, values[0].size)
-            values = np.abs(values)
-            largest_q_idx = np.argpartition(values, 0-q_t[idx])[(0-q_t[idx]):]
-            norm = LA.norm([values[x] for x in largest_q_idx])
+            if args.schedule_policy == "B":
+                for k in w_glob.keys():
+                    norm += math.pow(torch.norm(w[k]-w_glob[k]), 2)
+            elif args.schedule_policy == "D":
+                deltaw_list = []
+                for k in w_glob.keys():
+                    delta_w = w[k] - w_glob[k]
+                    deltaw_list.append(delta_w.resize(1, torch.numel(delta_w)))
+                big_tensor = torch.cat(deltaw_list, 1)
+                topvalues, topindices = torch.topk(big_tensor, q_t[idx])
+                bottomvalues, bottomindices = torch.topk(big_tensor, q_t[idx], largest=False)
+                values = torch.cat((topvalues, bottomvalues), 1).cpu().numpy()
+                values = np.reshape(values, values[0].size)
+                values = np.abs(values)
+                largest_q_idx = np.argpartition(values, 0-q_t[idx])[(0-q_t[idx]):]
+                norm = LA.norm([values[x] for x in largest_q_idx])
             if args.all_clients:
                 w_locals[idx] = copy.deepcopy(w)
                 norm_deltaw[idx] = copy.deepcopy(norm)
@@ -137,26 +138,45 @@ if __name__ == '__main__':
 
         # choose users to update in this round
         k = int(args.num_users * args.frac)
-        norm_deltaw = np.array(norm_deltaw)
-        idxs_users = norm_deltaw.argsort()[(0-k):]
+        if args.schedule_policy == "B" or args.schedule_policy == "D":
+            norm_deltaw = np.array(norm_deltaw)
+            idxs_users = norm_deltaw.argsort()[(0-k):]
+        elif args.schedule_policy == "A":
+            h_t = np.array(h_t)
+            idxs_users = h_t.argsort()[(0-k):]
         w_locals = [w_locals[x] for x in idxs_users]
         loss_locals = [loss_locals[x] for x in idxs_users]
 
         #calculate number of time slots allocated to clients
         n_k = []   # n_k[i]-->idxs_users[i]
-        equation21_denominator = 0
-        for j in idxs_users:
-            temp = 1
-            for i in idxs_users:
-                if(i != j):
-                    temp = temp * C_t[i]
-            equation21_denominator = equation21_denominator + norm_deltaw[j] * temp
-        for j in idxs_users:
-            temp = 1
-            for i in idxs_users:
-                if(i != j):
-                    temp = temp * C_t[i]
-            n_k.append(int(norm_deltaw[j] * temp * N / equation21_denominator))
+        if args.schedule_policy == "B" or args.schedule_policy == "D":
+            equation21_denominator = 0
+            for j in idxs_users:
+                temp = 1
+                for i in idxs_users:
+                    if(i != j):
+                        temp = temp * C_t[i]
+                equation21_denominator = equation21_denominator + norm_deltaw[j] * temp
+            for j in idxs_users:
+                temp = 1
+                for i in idxs_users:
+                    if(i != j):
+                        temp = temp * C_t[i]
+                n_k.append(int(norm_deltaw[j] * temp * N / equation21_denominator))
+        elif args.schedule_policy == "A":
+            equation13_denominator = 0
+            for j in idxs_users:
+                temp = 1
+                for i in idxs_users:
+                    if(i != j):
+                        temp = temp * C_t[i]
+                equation13_denominator = equation13_denominator + temp
+            for j in idxs_users:
+                temp = 1
+                for i in idxs_users:
+                    if(i != j):
+                        temp = temp * C_t[i]
+                n_k.append(int(temp * N / equation13_denominator))
 
         #find q_m(t) for the selected clients
         q_m_t = []
@@ -210,7 +230,7 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(range(len(loss_train)), loss_train)
     plt.ylabel('train_loss')
-    plt.savefig('./save/fed_{}_{}_{}_C{}_iid{}.png'.format(args.dataset, args.model, args.epochs, args.frac, args.iid))
+    plt.savefig('./save/fed_{}_{}_{}_C{}_iid{}_policy{}.png'.format(args.dataset, args.model, args.epochs, args.frac, args.iid, args.schedule_policy))
 
     # testing
     net_glob.eval()
