@@ -65,7 +65,8 @@ if __name__ == '__main__':
     w_glob = net_glob.state_dict()
 
     # training
-    loss_train = []
+    loss_test = []
+    acc_test = []
     cv_loss, cv_acc = [], []
     val_loss_pre, counter = 0, 0
     net_best = None
@@ -201,7 +202,7 @@ if __name__ == '__main__':
             largest_q_idx = np.argpartition(values_abs, 0-q_m_t[idx])[(0-q_m_t[idx]):]
             values = [values[x] for x in largest_q_idx]
             v_min = min(values)
-            quantize_d = (max(values) - v_min) / math.pow(2, 33)
+            quantize_d = (max(values) - v_min) / math.pow(2, 32)
             quantized_values = []
             for v in values:
                 temp_v = int((v - v_min) / quantize_d) * quantize_d + v_min
@@ -222,14 +223,17 @@ if __name__ == '__main__':
         net_glob.load_state_dict(w_glob)
 
         # print loss
-        loss_avg = sum(loss_locals) / len(loss_locals)
-        print('Round {:3d}, Average loss {:.3f}'.format(iter, loss_avg))
-        loss_train.append(loss_avg)
+        #loss_avg = sum(loss_locals) / len(loss_locals)
+        net_glob.eval()
+        acc_avg, loss_avg = test_img(net_glob, dataset_test, args)
+        print('Round {:3d}, Average loss {:.3f}, Accuracy {}'.format(iter, loss_avg, acc_avg))
+        loss_test.append(loss_avg)
+        acc_test.append(acc_avg)
 
     # plot loss curve
     plt.figure()
-    plt.plot(range(len(loss_train)), loss_train)
-    plt.ylabel('train_loss')
+    plt.plot(range(len(acc_test)), acc_test)
+    plt.ylabel('train_accuracy')
     plt.savefig('./save/fed_{}_{}_{}_C{}_iid{}_policy{}.png'.format(args.dataset, args.model, args.epochs, args.frac, args.iid, args.schedule_policy))
 
     # testing

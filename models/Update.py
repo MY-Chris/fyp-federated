@@ -33,7 +33,8 @@ class LocalUpdate(object):
     def train(self, net):
         net.train()
         # train and update
-        optimizer = torch.optim.SGD(net.parameters(), lr=self.args.lr, momentum=self.args.momentum)
+        #optimizer = torch.optim.SGD(net.parameters(), lr=self.args.lr, momentum=self.args.momentum)
+        optimizer = torch.optim.Adam(net.parameters(), lr=self.args.lr)
 
         epoch_loss = []
         for iter in range(self.args.local_ep):
