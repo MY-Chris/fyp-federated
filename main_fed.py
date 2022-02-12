@@ -17,6 +17,7 @@ from models.Update import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
 from models.test import test_img
+from queue import PriorityQueue
 
 
 if __name__ == '__main__':
@@ -113,7 +114,7 @@ if __name__ == '__main__':
             w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
             #calculate delta w
             norm = 0
-            if args.schedule_policy == "B":
+            if args.schedule_policy == "B" or args.schedule_policy == "C":
                 for k in w_glob.keys():
                     norm += math.pow(torch.norm(w[k]-w_glob[k]), 2)
             elif args.schedule_policy == "D":
@@ -145,12 +146,26 @@ if __name__ == '__main__':
         elif args.schedule_policy == "A":
             h_t = np.array(h_t)
             idxs_users = h_t.argsort()[(0-k):]
+        elif args.schedule_policy == "C":
+            Kc = int((args.num_users + k) / 2)
+            norm_deltaw = np.array(norm_deltaw)
+            h_t = np.array(h_t)
+            temp_idxs_users = h_t.argsort()[(0-Kc):]
+            queue = PriorityQueue()
+            for idx in temp_idxs_users:
+                queue.put((norm_deltaw[idx], idx))
+            for i in range(Kc - k):
+                queue.get()
+            idxs_users = []
+            idxs_users.append(queue.get()[1])
+            idxs_users = np.array(idxs_users)
+            
         w_locals = [w_locals[x] for x in idxs_users]
         loss_locals = [loss_locals[x] for x in idxs_users]
 
         #calculate number of time slots allocated to clients
         n_k = []   # n_k[i]-->idxs_users[i]
-        if args.schedule_policy == "B" or args.schedule_policy == "D":
+        if args.schedule_policy == "B" or args.schedule_policy == "D" or args.schedule_policy == "C":
             equation21_denominator = 0
             for j in idxs_users:
                 temp = 1

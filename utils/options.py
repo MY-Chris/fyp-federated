@@ -39,6 +39,6 @@ def args_parser():
     parser.add_argument('--all_clients', action='store_true', help='aggregation over all clients')
 
     # wireless arguments
-    parser.add_argument('--schedule_policy', type=str, default='D', help="choose schedule policy, options include A, B, D")
+    parser.add_argument('--schedule_policy', type=str, default='D', help="choose schedule policy, options include A, B, C, D")
     args = parser.parse_args()
     return args
